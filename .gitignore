@@ -1,0 +1,15 @@
+*.vo
+*.vok
+*.vos
+*.aux
+*.glob
+*.css
+*.html
+common/media/*
+common/jquery-ui/*
+*.svg
+*.js
+staging/*
+latex/*
+tools/*
+templates/*
