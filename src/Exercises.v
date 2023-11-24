@@ -221,6 +221,16 @@ Fixpoint clauseDenote(truth: ptruth_assns)(cl: clause) : Prop :=
     | COr lc rc => clauseDenote truth lc \/ clauseDenote truth rc
   end.
 
+Fixpoint clauseDenoteB(truth: ptruth_assns)(cl: clause) : bool :=
+  match cl with
+    | CVar v => match truth v with
+      | Some true => true
+      | _ => false
+    end
+    | CNeg cl => negb (clauseDenoteB truth cl)
+    | COr lc rc => clauseDenoteB truth lc || clauseDenoteB truth rc
+  end.
+
 Print Forall.
 Print Exists.
 
@@ -238,9 +248,64 @@ Fixpoint clauseAssignedAndFalse(truth : ptruth_assns)(cl: clause) : Prop :=
     | COr lc rc => clauseAssignedAndFalse truth lc /\ clauseAssignedAndFalse truth rc 
   end. 
 
-Definition dpll : forall f, 
-  {truth : ptruth_assns | Forall (clauseDenote truth) f } + {forall truth, Exists (clauseAssignedAndFalse truth) f}.
+Fixpoint clauseAssignedAndFalseB(truth : ptruth_assns)(cl: clause) : bool :=
+  match cl with
+    | CVar v => match truth v with
+      | Some false => true
+      | _ => false
+    end
+    | CNeg cl => clauseAssignedAndFalseB truth cl
+    | COr lc rc => clauseAssignedAndFalseB truth lc && clauseAssignedAndFalseB truth rc 
+  end. 
 
+Definition symbols := list nat.
+
+Fixpoint symbolsFromClause (cl : clause) : list nat :=
+  match cl with
+    | CVar v => cons v nil
+    | CNeg cl => symbolsFromClause cl
+    | COr lc rc => symbolsFromClause lc ++ symbolsFromClause rc
+  end.
+
+Fixpoint symbolsFromFormula (f : formula) : list nat :=
+  match f with
+    | nil => nil
+    | cl :: rest => 
+      symbolsFromClause cl ++ symbolsFromFormula rest
+  end.
+
+Print forallb.
+Print existsb.
+
+Definition dpll2 : forall f (s: symbols) (truth : ptruth_assns),
+  {truth : ptruth_assns | Forall (clauseDenote truth) f } + 
+    {forall truth, Exists (clauseAssignedAndFalse truth) f}.
+  Hint Constructors clause : core.
+  Hint Unfold clauseAssignedAndFalseB : core.
+  Hint Unfold clauseDenoteB : core.
+
+  refine (fix F (f : formula)(s : symbols)(truth : ptruth_assns) : 
+    {truth : ptruth_assns | Forall (clauseDenote truth) f } + {forall truth, Exists (clauseAssignedAndFalse truth) f} :=
+      if (forallb (clauseDenoteB truth) f) then [||truth||]
+      else 
+        if (existsb (clauseAssignedAndFalseB truth) f) then !!
+        else match s with
+          | nil => !!
+          | sh :: rest =>
+            F f rest (sh |-> true; truth) |||
+              F f rest (sh |-> false; truth)
+        end
+  ); clear F. induction f; crush.
+  - admit.
+  - admit.
+  - admit.
+  - apply e.
+  Admitted.
+
+Definition dpll(f: formulas) : {truth : ptruth_assns | Forall (clauseDenote truth) f } + 
+    {forall truth, Exists (clauseAssignedAndFalse truth) f} :=
+  let syms := symbolsFromFormula f in dpll2 f syms pempty_map.
+     
 (** All of the notations defined in this chapter, plus some extras, are available for import from the module [MoreSpecif] of the book source.
 
 %\begin{enumerate}%#<ol>#
